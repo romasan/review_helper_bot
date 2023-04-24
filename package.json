@@ -1,0 +1,16 @@
+{
+  "name": "review_helper_bot",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/romasan/review_helper_bot.git"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "myteam-bot-sdk": "^1.0.1",
+    "node-fetch": "^2.6.9"
+  }
+}
