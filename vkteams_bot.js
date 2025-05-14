@@ -1,9 +1,11 @@
 const { MessageBuilder, MyTeamSDK } = require('myteam-bot-sdk');
 const fetch = require("node-fetch");
+const { addToList } = require("./git");
 
 // https://myteam.mail.ru/botapi/
 
-let bot = {}
+let bot = {};
+const now = Date.now() + 1000;
 
 const getSelfInfo = async ({ token, apiUrl }) => {
 	const resp = await fetch(`${apiUrl}self/get?token=${token}`);
@@ -24,18 +26,42 @@ const logMembers = async ({ sdk, chatId, type }) => {
 		.map((member) => member.userId);
 
 	sdk.sendText(chatId, `members:\n${members.join('\n')}`);
-}
+};
+
+const helpText = `\
+бот понимает сообщения в фомате
+vkpl-1234
+https://jira.vk.team/browse/VKPL-1234
+https://vkpl-1234.founder-tv-alpha.my.cloud.devmail.ru/
+`;
+
+const start = async ({ sdk, chatId, type }) => {
+	sdk.sendText(chatId, helpText);
+};
+
+const help = async ({ sdk, chatId, type }) => {
+	sdk.sendText(chatId, Object.keys(commands).map(e => `/${e}`).join('\n'));
+};
 
 const commands = {
 	members: logMembers,
+	start,
+	help,
 };
 
+const getBranchNames = (text) => text.toLowerCase().match(/vkpl-\d+/g);
+
+const skip = {};
+
 const init = ({ token, apiUrl }) => {
+	// console.log('==== INIT', { token, apiUrl });
+	console.log('start chat bot');
+
 	const sdk = new MyTeamSDK({ token, baseURL: apiUrl });
 		
 	getSelfInfo({ token, apiUrl });
 	
-	const waitingForInput = {};
+	// const waitingForInput = {};
 	
 	sdk.on('newMessage', (event) => {
 		const {
@@ -49,28 +75,54 @@ const init = ({ token, apiUrl }) => {
 				userId,
 			},
 		} = event.payload;
-	
-		const waitingForInputKey = `${chatId}+${userId}`;
-	
-		if (waitingForInputKey in waitingForInput) {
-	
-			const command = waitingForInput[waitingForInputKey];
-	
-			delete waitingForInput[waitingForInputKey];
-	
-			commands[command](text);
-	
+
+		// console.log('==== newMessage:parts', event?.payload?.parts?.[0].payload?.message?.text);
+
+		if (Date.now() <= now) {
+			console.log(`SKIP: ${text}`);
+
+			if (!skip[chatId]) {
+				sdk.sendText(chatId, `Привет, я вернулся, если нужна моя помощь повтори сообщение`);
+			}
+
+			skip[chatId] = true;
+
 			return;
 		}
 	
-		const [, _command, context] = text.match(/^\/(\w+) ?([\w\W]+)?/) || [];
+		// const waitingForInputKey = `${chatId}+${userId}`;
+	
+		// if (waitingForInputKey in waitingForInput) {
+	
+		// 	const command = waitingForInput[waitingForInputKey];
+	
+		// 	delete waitingForInput[waitingForInputKey];
+	
+		// 	commands[command](text);
+	
+		// 	return;
+		// }
+
+		const _text = text || event?.payload?.parts?.[0].payload?.message?.text || '';
+	
+		const [, _command, context] = _text.match(/^\/(\w+) ?([\w\W]+)?/) || [];
 		const command = _command?.toLowerCase();
 	
 		if (commands[command]) {
 			commands[command]({ sdk, text, msgId, chatId, type, userId, context });
+
+			return;
 		}
-	
-		console.log('==== newMessage', event);
+
+		const branches = getBranchNames(_text);
+
+		if (branches) {
+			addToList(branches, async (txt) => {
+				await sdk.sendText(chatId, txt);
+			});
+		} else {
+			sdk.sendText(chatId, `❌ ничего не понял)\n${helpText}`);
+		}
 	
 		// const message = new MessageBuilder()
 		// 	.text('📊')
@@ -93,13 +145,13 @@ const init = ({ token, apiUrl }) => {
 		// sdk.sendText(chatId, 'bar');
 	});
 	
-	sdk.on('callbackQuery', (event) => {
-		console.log('==== callbackQuery', event)
-	});
+	// sdk.on('callbackQuery', (event) => {
+	// 	console.log('==== callbackQuery', event)
+	// });
 	
-	sdk.on('error', (error) => {
-		console.error(error);
-	});
+	// sdk.on('error', (error) => {
+	// 	console.error(error);
+	// });
 	
 	// sdk.addCommand('/foo', async (ctx) => {
 	// 	ctx.sdk.sendText(ctx.event.payload.chat.chatId, 'bar');

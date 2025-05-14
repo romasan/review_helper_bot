@@ -1,8 +1,10 @@
 {
   "name": "review_helper_bot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
-    "start": "node index.js"
+    "start": "pm2 start node index.js --name vk-teams-bot",
+    "stop": "pm2 stop vk-teams-bot",
+    "logs": "pm2 log"
   },
   "repository": {
     "type": "git",
@@ -11,6 +13,7 @@
   "dependencies": {
     "dotenv": "^16.0.3",
     "myteam-bot-sdk": "^1.0.1",
-    "node-fetch": "^2.6.9"
+    "node-fetch": "^2.6.9",
+    "pm2": "^6.0.5"
   }
 }
