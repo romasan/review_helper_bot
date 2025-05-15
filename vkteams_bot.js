@@ -1,6 +1,7 @@
 const { MessageBuilder, MyTeamSDK } = require('myteam-bot-sdk');
 const fetch = require("node-fetch");
 const { addToList } = require("./git");
+const fs = require('fs');
 
 // https://myteam.mail.ru/botapi/
 
@@ -75,6 +76,11 @@ const init = ({ token, apiUrl }) => {
 				userId,
 			},
 		} = event.payload;
+
+		try {
+			const postfix = Array(4).fill().map(() => parseInt(Math.random() * 10)).join('');
+			fs.writeFileSync(`${__dirname}/logs/${Date.now()}-${chatId}-${postfix}`, JSON.stringify(event.payload, null, 2));
+		} catch (ignore) {}
 
 		// console.log('==== newMessage:parts', event?.payload?.parts?.[0].payload?.message?.text);
 
