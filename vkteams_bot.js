@@ -68,12 +68,8 @@ const ping = async (host, pingInterval, sdk, masterChatId) => {
 		return;
 	}
 
-	console.log('ping', host);
-
 	try {
 		await fetch(host, { signal: AbortSignal.timeout(10_000) });
-
-		console.log('ping OK');
 
 		if (!vpnStatus) {
 			sdk.sendText(masterChatId, `😸 VPN снова в деле`);
@@ -81,8 +77,6 @@ const ping = async (host, pingInterval, sdk, masterChatId) => {
 
 		vpnStatus = true;
 	} catch (error) {
-		console.log('ping FAIL');
-
 		if (vpnStatus) {
 			sdk.sendText(masterChatId, `😾 VPN помер`);
 		}
