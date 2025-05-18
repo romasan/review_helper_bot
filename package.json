@@ -3,8 +3,10 @@
   "version": "1.0.2",
   "scripts": {
     "start": "pm2 start node index.js --name vk-teams-bot",
-    "stop": "pm2 stop vk-teams-bot",
+    "stop": "pm2 stop vk-teams-bot && pm2 delete vk-teams-bot",
     "logs": "pm2 log",
+    "proxy": "pm2 node proxy.js --name proxy",
+    "stop-proxy": "pm2 stop proxy && pm2 delete proxy",
     "dev": "node index.js"
   },
   "repository": {
