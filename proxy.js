@@ -45,4 +45,5 @@ const webServer = http.createServer(async (req, res) => {
     res.end('empty x-host');
 });
 
-webServer.listen(parseInt(PROXY_PORT), 'localhost');
+webServer.listen(parseInt(PROXY_PORT));
+console.log(`start proxy on ${parseInt(PROXY_PORT)} port at ${new Date()}`);
