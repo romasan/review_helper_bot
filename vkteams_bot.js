@@ -1,6 +1,6 @@
 const { MessageBuilder, MyTeamSDK } = require('myteam-bot-sdk');
 const fetch = require("node-fetch");
-const { addToList } = require("./git");
+const { addToList, gitLogs } = require("./git");
 const fs = require('fs');
 
 // https://myteam.mail.ru/botapi/
@@ -45,20 +45,63 @@ const help = async ({ sdk, chatId, type }) => {
 };
 
 const commands = {
-	members: logMembers,
+	// members: logMembers,
 	start,
-	help,
+	// help,
+};
+
+// const logs = 
+
+const masterCommands = {
+	logs: gitLogs,
 };
 
 const getBranchNames = (text) => text.toLowerCase().match(/vkpl-\d+/g);
 
 const skip = {};
 
-const init = ({ token, apiUrl }) => {
+let vpnStatus = true;
+const ping = async (host, pingInterval, sdk, masterChatId) => {
+	if (!host) {
+		sdk.sendText(masterChatId, `Не настроен хост для пингования подключен ли VPN`);
+
+		return;
+	}
+
+	console.log('ping', host);
+
+	try {
+		await fetch(host, { signal: AbortSignal.timeout(10_000) });
+
+		console.log('ping OK');
+
+		if (!vpnStatus) {
+			sdk.sendText(masterChatId, `😸 VPN снова в деле`);
+		}
+
+		vpnStatus = true;
+	} catch (error) {
+		console.log('ping FAIL');
+
+		if (vpnStatus) {
+			sdk.sendText(masterChatId, `😾 VPN помер`);
+		}
+
+		vpnStatus = false;
+	}
+
+	setTimeout(() => {
+		ping(host, pingInterval, sdk, masterChatId);
+	}, 1000 * pingInterval)
+};
+
+const init = ({ token, apiUrl, masterChatId, pingHost, pingInterval }) => {
 	// console.log('==== INIT', { token, apiUrl });
-	console.log('start chat bot');
+	console.log('Start chat bot', new Date());
 
 	const sdk = new MyTeamSDK({ token, baseURL: apiUrl });
+
+	ping(pingHost, pingInterval, sdk, masterChatId);
 		
 	getSelfInfo({ token, apiUrl });
 	
@@ -79,6 +122,7 @@ const init = ({ token, apiUrl }) => {
 
 		try {
 			const postfix = Array(4).fill().map(() => parseInt(Math.random() * 10)).join('');
+
 			fs.writeFileSync(`${__dirname}/logs/${Date.now()}-${chatId}-${postfix}`, JSON.stringify(event.payload, null, 2));
 		} catch (ignore) {}
 
@@ -110,12 +154,18 @@ const init = ({ token, apiUrl }) => {
 		// }
 
 		const _text = text || event?.payload?.parts?.[0].payload?.message?.text || '';
-	
+
 		const [, _command, context] = _text.match(/^\/(\w+) ?([\w\W]+)?/) || [];
 		const command = _command?.toLowerCase();
 	
 		if (commands[command]) {
 			commands[command]({ sdk, text, msgId, chatId, type, userId, context });
+
+			return;
+		}
+
+		if (chatId === masterChatId && masterCommands[command]) {
+			masterCommands[command]({ sdk, text, msgId, chatId, type, userId, context });
 
 			return;
 		}
