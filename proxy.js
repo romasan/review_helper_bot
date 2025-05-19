@@ -32,7 +32,7 @@ const webServer = http.createServer(async (req, res) => {
 
         if (cb) {
             res.writeHead(200, { 'Content-Type': 'text/javascript' });
-            res.end(`window['${cb}']('${raw}')`);
+            res.end(`window['${cb}'](\`${raw}\`)`);
 
             return;
         }
