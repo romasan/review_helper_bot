@@ -8,6 +8,15 @@ const { PROXY_PORT } = process.env;
 // curl -H 'X-Host: https://qwerty.ru' -H 'Authorization: Bearer 1234567' localhost:3001/foo/bar
 // curl -H 'Authorization: Bearer x1234567' localhost:3001/foo/bar?x-host=https://qwerty.ru&x-authorization=Bearer%20x1234567
 
+function btoa2(str) {
+    const utf8Bytes = new TextEncoder().encode(str);
+    let binary = '';
+    utf8Bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+    });
+    return btoa(binary);
+}
+
 const webServer = http.createServer(async (req, res) => {
     const query = url.parse(req.url, true).query;
 
@@ -32,7 +41,7 @@ const webServer = http.createServer(async (req, res) => {
 
         if (cb) {
             res.writeHead(200, { 'Content-Type': 'text/javascript' });
-            res.end(`window['${cb}'](\`${raw}\`)`);
+            res.end(`window['${cb}'](\`${btoa2(JSON.stringify(raw))}\`)`);
 
             return;
         }
