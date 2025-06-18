@@ -1,6 +1,6 @@
 const { MessageBuilder, MyTeamSDK } = require('myteam-bot-sdk');
 const fetch = require("node-fetch");
-const { addToList, gitLogs } = require("./git");
+const { addToList, gitLogs, justWatch } = require("./git");
 const fs = require('fs');
 
 // https://myteam.mail.ru/botapi/
@@ -14,19 +14,21 @@ const getSelfInfo = async ({ token, apiUrl }) => {
 	bot = json;
 };
 
-const logMembers = async ({ sdk, chatId, type }) => {
-	
-	if (type !== 'group') {
-		sdk.sendText(chatId, '⛔ Эта комманда работает только в чате');
-		return;
+const _ping = async ({ sdk, pingHost, pingInterval, masterChatId }) => {
+	ping(pingHost, pingInterval, sdk, masterChatId, true);
+};
+_ping.description = 'принудительный запуск проверки подключения к vpn';
+
+const watch = async ({ sdk, chatId, context }) => {
+	const branches = getBranchNames(context);
+
+	if (branches) {
+		justWatch(branches, async (txt) => {
+			await sdk.sendText(chatId, txt);
+		});
+	} else {
+		await sdk.sendText(chatId, `Не нашёл тут упоминания веток:\n"${context}"`);
 	}
-
-	const _members = await sdk.getMembers(chatId);
-	const members = _members
-		.filter((member) => member.userId !== bot.userId)
-		.map((member) => member.userId);
-
-	sdk.sendText(chatId, `members:\n${members.join('\n')}`);
 };
 
 const helpText = `\
@@ -39,21 +41,38 @@ https://vkpl-1234.founder-tv-alpha.my.cloud.devmail.ru/
 const start = async ({ sdk, chatId, type }) => {
 	sdk.sendText(chatId, helpText);
 };
+start.description = 'начало работы с ботом';
 
-const help = async ({ sdk, chatId, type }) => {
-	sdk.sendText(chatId, Object.keys(commands).map(e => `/${e}`).join('\n'));
+const getHelpList = (list) => {
+	return Object.entries(list)
+		.map(([key, func]) => {
+			if (func.description) {
+				return `/${key} - ${func.description}`;
+			}
+
+			return `/${key}`;
+		})
+		.join('\n');
 };
+
+const help = async ({ sdk, chatId, masterChatId }) => {
+	if (chatId === masterChatId) {
+		sdk.sendText(chatId, `${getHelpList(commands)}\n${getHelpList(masterCommands)}`);
+	} else {
+		sdk.sendText(chatId, getHelpList(commands));
+	}
+};
+help.description = 'вывод этой подсказки';
 
 const commands = {
-	// members: logMembers,
 	start,
-	// help,
+	help,
+	// watch,
 };
-
-// const logs = 
 
 const masterCommands = {
 	logs: gitLogs,
+	ping: _ping,
 };
 
 const getBranchNames = (text) => text.toLowerCase().match(/vkpl-\d+/g);
@@ -61,7 +80,7 @@ const getBranchNames = (text) => text.toLowerCase().match(/vkpl-\d+/g);
 const skip = {};
 
 let vpnStatus = true;
-const ping = async (host, pingInterval, sdk, masterChatId) => {
+const ping = async (host, pingInterval, sdk, masterChatId, once = false) => {
 	if (!host) {
 		sdk.sendText(masterChatId, `Не настроен хост для пингования подключен ли VPN`);
 
@@ -71,22 +90,26 @@ const ping = async (host, pingInterval, sdk, masterChatId) => {
 	try {
 		await fetch(host, { signal: AbortSignal.timeout(10_000) });
 
-		if (!vpnStatus) {
+		if (!vpnStatus && !once) {
 			sdk.sendText(masterChatId, `😸 VPN снова в деле`);
 		}
 
 		vpnStatus = true;
 	} catch (error) {
-		if (vpnStatus) {
+		if (vpnStatus && !once) {
 			sdk.sendText(masterChatId, `😾 VPN помер`);
 		}
 
 		vpnStatus = false;
 	}
 
-	setTimeout(() => {
-		ping(host, pingInterval, sdk, masterChatId);
-	}, 1000 * pingInterval)
+	if (once) {
+		sdk.sendText(masterChatId, vpnStatus ? '😸 VPN в норме' : '😾 VPN помер');
+	} else {
+		setTimeout(() => {
+			ping(host, pingInterval, sdk, masterChatId);
+		}, 1000 * pingInterval)
+	}
 };
 
 const init = ({ token, apiUrl, masterChatId, pingHost, pingInterval }) => {
@@ -133,19 +156,6 @@ const init = ({ token, apiUrl, masterChatId, pingHost, pingInterval }) => {
 
 			return;
 		}
-	
-		// const waitingForInputKey = `${chatId}+${userId}`;
-	
-		// if (waitingForInputKey in waitingForInput) {
-	
-		// 	const command = waitingForInput[waitingForInputKey];
-	
-		// 	delete waitingForInput[waitingForInputKey];
-	
-		// 	commands[command](text);
-	
-		// 	return;
-		// }
 
 		const _text = text || event?.payload?.parts?.[0].payload?.message?.text || '';
 
@@ -153,13 +163,13 @@ const init = ({ token, apiUrl, masterChatId, pingHost, pingInterval }) => {
 		const command = _command?.toLowerCase();
 	
 		if (commands[command]) {
-			commands[command]({ sdk, text, msgId, chatId, type, userId, context });
+			commands[command]({ sdk, text, msgId, chatId, type, userId, context, masterChatId });
 
 			return;
 		}
 
 		if (chatId === masterChatId && masterCommands[command]) {
-			masterCommands[command]({ sdk, text, msgId, chatId, type, userId, context });
+			masterCommands[command]({ sdk, text, msgId, chatId, type, userId, context, pingHost, pingInterval, masterChatId });
 
 			return;
 		}

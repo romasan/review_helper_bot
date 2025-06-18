@@ -8,7 +8,7 @@ require("dotenv").config();
 const execPromise = util.promisify(exec);
 const readDircPromise = util.promisify(fs.readdir);
 
-const { GIT_PROJECT_PATH, DEBUG_MODE } = process.env;
+const { GIT_PROJECT_PATH } = process.env;
 
 const repoPath = path.resolve(GIT_PROJECT_PATH);
 
@@ -165,8 +165,14 @@ const gitLogs = async ({ sdk, chatId, context }) => {
 
   sdk.sendText(chatId, part.join('\n') + `\n${part.length} of ${files.length - 1}`);
 };
+gitLogs.description = 'вывод истории обращений';
+
+const justWatch = async (branch, log) => {
+  // TODO
+};
 
 module.exports = {
   addToList,
   gitLogs,
+  justWatch,
 };
